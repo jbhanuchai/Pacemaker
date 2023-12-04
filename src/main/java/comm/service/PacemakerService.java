@@ -16,7 +16,6 @@ import java.time.format.DateTimeFormatter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
-import java.util.Random;
 
 @Service
 @Slf4j
@@ -76,11 +75,6 @@ public class PacemakerService {
         } else {
             throw new RuntimeException("Patient with ID " + patientId + " not found");
         }
-    }
-
-    private String generateRandomHeartRate() {
-        Random random = new Random();
-        return String.valueOf(random.nextInt(80) + 40); // Generates a number between 40 to 120
     }
 
     // Method to simulate changing heart rate every 3 seconds
@@ -182,12 +176,37 @@ public class PacemakerService {
         if (patientDetails != null) {
             String formattedDateOfBirth = formatMonthAndDate(patientDetails.getDateOfBirth());
             patientDetails.setDateOfBirth(formattedDateOfBirth);
-            return pacemakerRepository.findPatientById(patientId, stringEncryptor);
-        }
-        else {
+
+            // Decrypt SSN and mask it
+            String decryptedSSN = null;
+            try {
+                decryptedSSN = stringEncryptor.decrypt(patientDetails.getSsn());
+                String maskedSSN = maskSSN(decryptedSSN);
+                patientDetails.setSsn(maskedSSN);
+            } catch (Exception e) {
+                log.error("Error decrypting SSN for patient ID " + patientId + ": " + e.getMessage());
+                // Handle decryption errors, such as logging and setting SSN to a default value
+                patientDetails.setSsn("SSN Decryption Error");
+            }
+
+            return patientDetails;
+        } else {
             return null;
         }
     }
+
+
+    private String maskSSN(String ssn) {
+        // Check if SSN is valid
+        if (ssn != null && ssn.length() >= 4) {
+            String lastFourDigits = ssn.substring(ssn.length() - 4); // Extract last four digits
+            String masked = ssn.substring(0, ssn.length() - 4).replaceAll("\\d", "*"); // Mask all but last four digits
+            return masked + lastFourDigits; // Combine masked and unmasked parts
+        } else {
+            return null; // Return null for invalid SSN
+        }
+    }
+
 
     private String formatMonthAndDate(String dateOfBirth) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd");
